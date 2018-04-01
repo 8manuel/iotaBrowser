@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<title>THEX - Iota tangle explorer</title>
+<meta charset="utf-8">
+<body>
+<div>
+	<input type="text" id="strObj" placeholder="address, transaction, bundle, obsolete tag"/>
+	<button type="button" onclick="getAddress();">Address</button>
+	<button type="button" onclick="getTransaction();">Transaction</button>
+	<button type="button" onclick="getBundle();">Bundle</button>
+	<button type="button" onclick="getObsoleteTag();">Obsolete tag</button>
+	<span class="comment">server:</span>
+	<span id="network">testnet</span>
+	<button type="button" id="clean" onclick="cleanInfo();">Clean logs</button>
+</div>
+<div id="info"></div>
+</body>
+</html> 
+
+<style type="text/css">
+body { font-family: Arial; margin:0;}
+div { padding: 0.25em 0.5em; }
+button#clean { float: right; }
+input#strObj { width:30em; }
+b.getObj { color: royalblue; cursor: pointer; }
+span.tit { padding: 0.3em 0.5em 0 0; float: left; width: 8em; font-weight: bold; }
+span.comment, span#hint { color:gray; font-size:15px;}
+span#network { font-size:15px;}
+span.logE { color:red; }
+div#info { margin-top: 0.5em; padding: 0.5em; background: beige; font-size: 13px; font-family: mono; }
+</style>
+
+<script type="text/javascript">
+
+function gEl(id) { return document.getElementById(id); }
+let network = gEl('network');
+let strObj = gEl('strObj');
+let infodiv = gEl('info');
+
+window.onload = function() {
+	sendAjax('get','/get/server/network', null, showNetwork);
+};
+
+
+// showNetwork shows IRI client network connection
+function showNetwork(ok, obj) {
+	let server = ok ? (obj.error ? obj.error : obj.server) : 'none';
+	network.innerHTML = server;
+	log('M', 'server', server, ok && !obj.error ? obj.milestone : '');
+	log('M');
+}
+
+// showTransaction displays transaction data
+function showTransaction(hash, included, t) {
+	log('M');
+	log('M', 'hash', hash, included ? 'included' : 'notIncluded', 'ts', t.Timestamp);
+	log('M', 'addr', t.Address, 'value', t.Value)
+	log('M', 'bund', t.Bundle, 'tag', t.Tag, 'oTag', t.ObsoleteTag)
+	log('M', 'ttrx', t.TrunkTrx, 'curInd', t.CurrentIndex, 'lstInd', t.LastIndex)
+	log('M', 'btrx', t.BranchTrx, 'attTs', t.AttachmentTs, 'attTsLow', t.AttachmentTsLow, 'attTsUp', t.AttachmentTsUp)
+}
+
+// getAddress gets address balance and transactions
+function getAddress(val, clean) {
+	if (!val) val = strObj.value
+	sendAjax('get','/get/address/'+val, null, function(ok, obj) {
+		if (!ok || obj.error) {
+			log('E', 'GET', 'addr', val, obj && obj.error ? obj.error : 'connection problem');
+			if (clean) enableInfo();
+			return;
+		}
+		if (clean) cleanInfo(true);
+		let num = obj.hashes && obj.hashes.length>0 ? obj.hashes.length : 0;
+		log('M', 'GET', 'addr', val, 'balance', obj.balance, 'transactions', num+(num>400 ? ' (maybe there are more)': ''));
+		for (i in obj.trans) showTransaction(obj.hashes[i], obj.included[i], obj.trans[i]);
+		log('M');
+	});
+}
+
+// getTransaction gets transaction data and children transaction
+function getTransaction(val, clean) {
+	if (!val) val = strObj.value
+	sendAjax('get','/get/transaction/'+val, null, function(ok, obj) {
+		if (!ok || obj.error) {
+			log('E', 'hash', val, obj && obj.error ? obj.error : 'connection problem');
+			if (clean) enableInfo();
+			return;
+		}	
+		if (clean) cleanInfo(true);
+		log('M', 'GET', 'hash', val);
+		showTransaction(val, obj.included[0], obj.trans[0]);
+		let num = obj.hashes && obj.hashes.length>0 ? obj.hashes.length : 0;
+		log('M', 'children', num);
+		if (num) for (i in obj.hashes) log('M', 'hash', obj.hashes[i]);
+		log('M');
+	});
+}
+
+// getBundle gets bundle transactions
+function getBundle(val, clean) {
+	if (!val) val = strObj.value
+	sendAjax('get','/get/bundle/'+val, null, function(ok, obj) {
+		if (!ok || obj.error) {
+			log('E', 'GET', 'bund', val, obj && obj.error ? obj.error : 'connection problem');
+			if (clean) enableInfo();
+			return;
+		}
+		if (clean) cleanInfo(true);
+		let num = obj.hashes && obj.hashes.length>0 ? obj.hashes.length : 0;
+		log('M', 'GET', 'bund', val, 'transactions', num+(num>400 ? ' (maybe there are more)': ''));
+		for (i in obj.trans) showTransaction(obj.hashes[i], obj.included[i], obj.trans[i]);
+		log('M');
+	});
+}
+
+// getObsoleteTag gets obsolete tag transactions
+function getObsoleteTag(val, clean) {
+	if (!val) val = strObj.value
+	sendAjax('get','/get/obsoleteTag/'+val, null, function(ok, obj) {
+		if (!ok || obj.error) {
+			log('E', 'GET', 'oTag', val, obj && obj.error ? obj.error : 'connection problem');
+			if (clean) enableInfo();
+			return;
+		}
+		if (clean) cleanInfo(true);
+		let num = obj.hashes && obj.hashes.length>0 ? obj.hashes.length : 0;
+		log('M', 'GET', 'oTag', val, 'transactions', num+(num>400 ? ' (maybe there are more)': ''));
+		if (num) for (i in obj.hashes) log('M', 'hash', obj.hashes[i]);
+		log('M');
+	});
+}
+// getObj gets object and cleans info div messages 
+function getObj(obj, val) {
+	switch (obj) {
+	case 'addr': getAddress(val, true); break;
+	case 'hash': getTransaction(val, true); break;
+	case 'bund': getBundle(val, true); break;
+	case 'oTag': getObsoleteTag(val, true); break;
+	}
+	infodiv.style.opacity = 0.4;	
+}
+
+// cleanInfo cleans info div messages
+function cleanInfo(opacity) {
+	infodiv.innerHTML = "";
+	if (opacity) infodiv.style.opacity = 1;
+	
+}
+
+// enableInfo enables info div messages
+function enableInfo() {
+	infodiv.style.opacity = 1;
+	
+}
+
+// sendAjaxWait rejects new requests till the current one is done
+let sendAjaxWait = false;
+
+// sent http post/get request using ajax and show the result
+function sendAjax(method, action, data, callback) {
+	if (sendAjaxWait) return;
+	sendAjaxWait = true;
+	console.log('sendAjax', method, action, data)
+	// construct an HTTP request with json content type
+	var xhr = new XMLHttpRequest();
+	xhr.open(method, action, true);
+	if (data) xhr.setRequestHeader('Content-Type', 'application/json; charset=UTF-8');
+	// prepare the onload callback and send the data as json
+	xhr.send(data ? JSON.stringify(data) : null);
+	xhr.onload = function () {
+		if (xhr.readyState === xhr.DONE) {
+			console.log(method.toUpperCase()+":"+action, "status:"+xhr.status);
+			console.log(xhr.response);
+			if (callback) {
+				if (xhr.status='200') callback(true, JSON.parse(xhr.response));
+				else  callback(false, null);
+			}
+		}
+		sendAjaxWait = false;
+	};
+	xhr.onerror = function () {
+		callback(false, null);
+		sendAjaxWait = false;
+	}
+}
+
+// mapA maps tags to html onclick actions
+let mapA = {'hash':'hash', 'ttrx': 'hash', 'btrx': 'hash', 'addr':'addr', 'bund':'bund', 'oTag':'oTag'};
+
+// log function, writes in the screen log and does automatic html of some tags mapped in mapA
+function log(type) {
+	let i, map, data = '', esc = ''
+	if (!type) type = ' '	// type: E error, M map tag, I info, T trace
+	for (i=1; i<arguments.length; i++) {
+		map = mapA[arguments[i]], clickFn = type=='M' && map && i+1<arguments.length ? 'getObj(\''+map+'\',\''+arguments[i+1]+'\');' : '';
+		data += (data ? '·' : '') + (clickFn ? '<b class="getObj" onclick="'+clickFn+'">'+arguments[i]+'</b>' : argLog(arguments[i]))
+	}
+	var msg = data
+	if (type=='T') console.log(msg)
+	infodiv.innerHTML += '<span class="log'+type+'">'+msg+'</span><br>';
+	function argLog(a) {
+		if (a==undefined) return '!'
+		if (typeof a!='object') return a
+		a = JSON.stringify(a)
+		if (a.length==26 && a.charAt(0)=='"' && a.charAt(25)=='"') return a.substr(1,24)
+		return a
+	}
+}
+</script>
