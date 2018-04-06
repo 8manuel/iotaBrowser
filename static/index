@@ -73,7 +73,7 @@ function getAddress(val, clean) {
 		if (clean) cleanInfo(true);
 		let num = obj.hashes && obj.hashes.length>0 ? obj.hashes.length : 0;
 		log('M', 'GET', 'addr', val, 'balance', obj.balance, 'transactions', num+(num>400 ? ' (maybe there are more)': ''));
-		for (i in obj.trans) showTransaction(obj.hashes[i], obj.included[i], obj.trans[i]);
+		for (i in obj.trans) { console.log('showTrx', i); showTransaction(obj.hashes[i], obj.included[i], obj.trans[i]); }
 		log('M');
 	});
 }
@@ -83,7 +83,7 @@ function getTransaction(val, clean) {
 	if (!val) val = strObj.value
 	sendAjax('get','/get/transaction/'+val, null, function(ok, obj) {
 		if (!ok || obj.error) {
-			log('E', 'hash', val, obj && obj.error ? obj.error : 'connection problem');
+			log('E', 'GET', 'hash', val, obj && obj.error ? obj.error : 'connection problem');
 			if (clean) enableInfo();
 			return;
 		}	
@@ -198,7 +198,8 @@ function log(type) {
 	}
 	var msg = data
 	if (type=='T') console.log(msg)
-	infodiv.innerHTML += '<span class="log'+type+'">'+msg+'</span><br>';
+	span = document.createElement('span'), span.innerHTML = msg, span.class = 'log'+type;
+	infodiv.appendChild(span), infodiv.appendChild(document.createElement('br')); // is more performant appendChild than infoDiv += 'blabla'
 	function argLog(a) {
 		if (a==undefined) return '!'
 		if (typeof a!='object') return a
